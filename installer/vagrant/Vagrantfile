@@ -1,0 +1,46 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  N = 1 # max number of worker nodes
+
+  #=============#
+  # Master Node #
+  #=============#
+
+    config.vm.define "control-plane" do |cfg|
+      cfg.vm.box = "ubuntu/jammy64"
+      cfg.vm.provider "virtualbox" do |vb|
+        vb.name = "control-plane"
+        vb.cpus = 2
+        vb.memory = 2048
+        vb.customize ["modifyvm", :id, "--groups", "/kubernetes-cluster"]
+      end
+      cfg.vm.host_name = "control-plane"
+      cfg.vm.network "private_network", ip: "192.168.1.10"
+      cfg.vm.network "forwarded_port", guest: 22, host: 60010, auto_correct: true, id: "ssh"
+      cfg.vm.synced_folder "../data", "/vagrant", disabled: true
+      cfg.vm.provision "shell", path: "../install.sh", args: "-t control-plane"
+    end
+
+  #==============#
+  # Worker Nodes #
+  #==============#
+
+  (1..N).each do |i|
+    config.vm.define "kubernetes-worker-node-#{i}" do |cfg|
+      cfg.vm.box = "ubuntu/jammy64"
+      cfg.vm.provider "virtualbox" do |vb|
+        vb.name = "kubernetes-worker-node-#{i}"
+        vb.cpus = 2
+        vb.memory = 2048
+        vb.customize ["modifyvm", :id, "--groups", "/group-of-kubernetes"]
+      end
+      cfg.vm.host_name = "kubernetes-worker-node-#{i}"
+      cfg.vm.network "private_network", ip: "192.168.1.1#{i}"
+      cfg.vm.network "forwarded_port", guest: 22, host: "6010#{i}", auto_correct: true, id: "ssh"
+      cfg.vm.synced_folder "../data", "/vagrant", disabled: true
+      cfg.vm.provision "shell", path: "../install.sh", args: "-t node"
+    end
+  end
+end

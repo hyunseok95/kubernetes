@@ -1,0 +1,6 @@
+configInline:
+  address-pools:
+    - name: generic-cluster-pool
+      protocol: layer2
+      addresses:
+        - 192.168.56.10-192.168.56.30

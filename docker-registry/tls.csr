@@ -1,0 +1,21 @@
+[req]
+distinguished_name = private_registry_cert_req
+x509_extensions = v3_req
+prompt = no
+
+[private_registry_cert_req]
+C = KR
+ST = SEOUL
+L = SEOUL
+O = Hyunseok95
+OU = Hyunseok95
+CN = 192.168.56.100
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.0 = kubernetes-master-node
+IP.0 = 192.168.56.100

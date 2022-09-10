@@ -81,9 +81,78 @@ scheduler:
   extraArgs:
     v: "5"
 ---
+# https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
+clusterDomain: cluster.local
 cgroupDriver: systemd
+staticPodPath: /etc/kubernetes/manifests
+# the maximum number of Pods that can run on this Kubelet. [Default: 110]
+maxPods: 200
+# synchronizing running containers and config. [Default: "1m"]
+syncFrequency: 1m
+# duration checking config files for new data. [Default: "20s"]
+fileCheckFrequency: 20s
+# duration checking http for new data. [Default: "20s"]
+httpCheckFrequency: 20s 
+# set to 0.0.0.0 for all interfaces. [Default: "0.0.0.0"]
+address: "0.0.0.0"
+port: 10250
+# how requests to the Kubelet's server are authenticated
+authentication:
+  anonymous:
+    # [Default: false]
+    enabled: false
+  webhook:
+    # [Default: true]
+    enabled: true
+    # [Default: "2m"]  
+    cacheTTL: 2m
+# how requests to the Kubelet's server are authorized.     
+authorization:
+  # [Default: "Webhook"]  
+  mode: Webhook
+  webhook: 
+    # [Default: "5m"]  
+    cacheAuthorizedTTL: "5m"
+    # [Default: "30s"]  
+    cacheUnauthorizedTTL: "30s"
+# the maximum event creations per second. [Default: 5]   
+eventRecordQPS: 5
+# enables log access and local running of containers
+enableDebuggingHandlers: true
+# enables lock contention profiling
+enableContentionProfiling: true
 ---
+# https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
+# IP address for proxy server
+bindAddress: "0.0.0.0"
+metricsBindAddress: 127.0.0.1:10249
+# Profiling handlers will be handled by metrics server.
+enableProfiling: true
+conntrack:
+  # the maximum number of NAT connections to track per CPU core 
+  maxPerCore: 0
+  min: 100000
+  tcpCloseWaitTimeout: 2s
+  tcpEstablishedTimeout: 60s
+# userspace, iptables, ipvs
+mode: ipvs
+iptables:
+  masqueradeAll: false
+  masqueradeBit: 16
+  minSyncPeriod: 5s
+  syncPeriod: 1m
+ipvs:
+  syncPeriod: 1m
+  minSyncPeriod: 5s
+  excludeCIDRs: []
+  scheduler: rr
+  strictARP: false
+  tcpTimeout: 0s
+  tcpFinTimeout: 0s
+  udpTimeout: 0s
+# Only applicable for proxyMode=userspace.
+udpIdleTimeout: 250ms

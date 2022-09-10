@@ -1,17 +1,17 @@
+# https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/#kubeadm-k8s-io-v1beta3-ClusterConfiguration
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 bootstrapTokens:
 - token: "gustjr.qnxmtmxmfoqxhzms"
+  ttl: "1h"
   usages:
   - authentication
   - signing
-  ttl: "1h"
 nodeRegistration:
-  # name: control-plane
+  criSocket: unix:////var/run/containerd/containerd.sock
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/control-plane
-  criSocket: unix:////var/run/containerd/containerd.sock
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
@@ -22,66 +22,70 @@ networking:
   dnsDomain: cluster.local
   serviceSubnet: "10.233.0.0/18"
   podSubnet: "10.233.64.0/18"
-etcd:
-  local:
-    dataDir: "/var/lib/etcd"
-apiServer:
-  extraArgs:
-    # 컨테이너에 권한 부여
-    allow-privileged: "true"        # 디폴트: false
-    authorization-mode: Node,RBAC       # 디폴트: "AlwaysAllow"
-    # The IP address on which to listen for the --secure-port port
-    bind-address: 0.0.0.0       # 디폴트: "0.0.0.0"
-    secure-port: "6443"
-    # 클러스터 ip 가 아닌 엔드포인트 ip 에 대한 요청의 aggregator 라우팅여부
-    enable-aggregator-routing: "false"
-    # Enable profiling via web interface host:port/debug/pprof/
-    profiling: "true"       # default: true
-    service-node-port-range: 30000-32767
-    service-cluster-ip-range: 10.233.0.0/18
-    service-account-lookup: "true"
-  extraVolumes:
-    - name: usr-share-ca-certificates
-      hostPath: /usr/share/ca-certificates
-      mountPath: /usr/share/ca-certificates
-      readOnly: true
-  timeoutForControlPlane: 5m0s
-controllerManager:
-  extraArgs:
-    # 네트워크 할당에 cidr 방식 허용 여부
-    allocate-node-cidrs: "true"
-    # 파드 네트워크 cidr
-    cluster-cidr: 10.233.64.0/18       
-    # 서비스 네트워크 cidr
-    service-cluster-ip-range: 10.233.0.0/18       
-    # --secure-port 옵션의 포트를 수신 대기할 아이피 주소
-    # 클러스터의 다른 구성요소와 CLI 나 웹에서 연결가능해야함.
-    # 기본값으로 0.0.0.0 즉 모든 인터페이스가 사용됨 (연결시 모든 인터페이스로 시도)
-    bind-address: 0.0.0.0
-    secure-port: "10257"
-    # 클러스터 이름
-    cluster-name: cluster.local
-    # Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.
-    configure-cloud-routes: "true"
-    # Mask size for IPv4 node cidr in dual-stack cluster. Default is 24
-    node-cidr-mask-size: "24"
-    # Enable profiling via web interface host:port/debug/pprof/
-    profiling: "true"
-    # 파드 가비지 컬렉터가 종료된 파드를 삭제하기 저에 존재할 수 있는 종료된 파드의 숫자
-    terminated-pod-gc-threshold: "12500"
-scheduler:
-  extraArgs:
-    bind-address: 0.0.0.0
-    secure-port: "10259"
-#    config: /etc/kubernetes/kubescheduler-config.yaml
-  extraVolumes:
-    - name: kubescheduler-config
-      hostPath: /etc/kubernetes/kubescheduler-config.yaml
-      mountPath: /etc/kubernetes/kubescheduler-config.yaml
-      readOnly: true
+# https://coredns.io/
 dns:
   imageRepository: registry.k8s.io/coredns
   imageTag: v1.8.6
+# https://etcd.io/
+etcd:
+  local:
+    mageRepository: "registry.k8s.io"
+    imageTag: "3.5.1-0"
+    dataDir: "/var/lib/etcd"
+    # https://etcd.io/docs/v3.5/op-guide/configuration/
+    # https://etcd.io/docs/v3.4/op-guide/configuration/
+    extraArgs:
+      wal-dir: /var/lib/etcd/wal
+      grpc-keepalive-interval: 1h
+      grpc-keepalive-timeout: 30s
+apiServer:
+  # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
+  extraArgs:
+    # If true, allow privileged containers. [Default: false]
+    allow-privileged: "true"
+    # Enables anonymous requests to the secure port of the API server. [Default: true]
+    anonymous-auth: "true"
+    # Ordered list of plug-ins to do authorization on secure port. [Default: Node,RBAC] 
+    authorization-mode: Node,RBAC
+    # Turns on aggregator routing requests to endpoints IP rather than cluster IP.
+    enable-aggregator-routing: "false"
+    # Enable to allow secrets of type 'bootstrap.kubernetes.io/token' in the 'kube-system' namespace
+    enable-bootstrap-token-auth: "false"
+    # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
+    profiling: "true"
+    # If true, validate ServiceAccount tokens exist in etcd as part of authentication.
+    service-account-lookup: "false"
+    # A port range to reserve for services with NodePort visibility
+    service-node-port-range: 30000-32767
+    # number for the log level verbosity
+    v: 5
+  extraVolumes:
+  - name: usr-share-ca-certificates
+    hostPath: /var/lib/kube-apiserver/ca-cert
+    mountPath: /usr/share/ca-certificates
+    readOnly: true
+  timeoutForControlPlane: 5m0s
+controllerManager:
+  # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
+  extraArgs:
+    # The number of garbage collector workers that are allowed to sync concurrently. [Default: 20]
+    concurrent-gc-syncs: 40
+    # The number of resource quotas that are allowed to sync concurrently. [Default: 5]
+    concurrent-resource-quota-syncs: 10
+    # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
+    profiling: "true"
+    # number for the log level verbosity
+    v: 5
+scheduler:
+  # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/
+  extraArgs:
+    config: /etc/kubernetes/kubescheduler-config.yaml
+    v: 5
+  extraVolumes:
+  - name: kubescheduler-config
+    hostPath: /var/lib/kube-scheduler/config.yaml
+    mountPath: /etc/kubernetes/kubescheduler-config.yaml
+    readOnly: true
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration

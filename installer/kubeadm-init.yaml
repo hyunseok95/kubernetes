@@ -79,13 +79,7 @@ controllerManager:
 scheduler:
   # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/
   extraArgs:
-    config: /etc/kubernetes/kubescheduler-config.yaml
     v: "5"
-  extraVolumes:
-  - name: kubescheduler-config
-    hostPath: /var/lib/kube-scheduler/config.yaml
-    mountPath: /etc/kubernetes/kubescheduler-config.yaml
-    readOnly: true
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration

@@ -58,7 +58,7 @@ apiServer:
     # A port range to reserve for services with NodePort visibility
     service-node-port-range: 30000-32767
     # number for the log level verbosity
-    v: 5
+    v: "5"
   extraVolumes:
   - name: usr-share-ca-certificates
     hostPath: /var/lib/kube-apiserver/ca-cert
@@ -69,18 +69,18 @@ controllerManager:
   # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
   extraArgs:
     # The number of garbage collector workers that are allowed to sync concurrently. [Default: 20]
-    concurrent-gc-syncs: 40
+    concurrent-gc-syncs: "40"
     # The number of resource quotas that are allowed to sync concurrently. [Default: 5]
-    concurrent-resource-quota-syncs: 10
+    concurrent-resource-quota-syncs: "10"
     # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
     profiling: "true"
     # number for the log level verbosity
-    v: 5
+    v: "5"
 scheduler:
   # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/
   extraArgs:
     config: /etc/kubernetes/kubescheduler-config.yaml
-    v: 5
+    v: "5"
   extraVolumes:
   - name: kubescheduler-config
     hostPath: /var/lib/kube-scheduler/config.yaml

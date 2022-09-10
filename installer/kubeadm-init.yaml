@@ -29,7 +29,7 @@ dns:
 # https://etcd.io/
 etcd:
   local:
-    mageRepository: "registry.k8s.io"
+    imageRepository: "registry.k8s.io"
     imageTag: "3.5.1-0"
     dataDir: "/var/lib/etcd"
     # https://etcd.io/docs/v3.5/op-guide/configuration/

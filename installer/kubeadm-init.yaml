@@ -7,6 +7,7 @@ bootstrapTokens:
   usages:
   - authentication
   - signing
+certificateKey: 7ff2ee8c0b348b678b934dda3ad78dafd0cd6dcb9d794df3bc19d5ae289ebc42
 nodeRegistration:
   criSocket: unix:////var/run/containerd/containerd.sock
   taints:
@@ -50,7 +51,7 @@ apiServer:
     # Turns on aggregator routing requests to endpoints IP rather than cluster IP.
     enable-aggregator-routing: "false"
     # Enable to allow secrets of type 'bootstrap.kubernetes.io/token' in the 'kube-system' namespace
-    enable-bootstrap-token-auth: "false"
+    enable-bootstrap-token-auth: "true"
     # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
     profiling: "true"
     # If true, validate ServiceAccount tokens exist in etcd as part of authentication.
@@ -108,6 +109,8 @@ authentication:
     enabled: true
     # [Default: "2m"]  
     cacheTTL: 2m
+  x509:
+    clientCAFile: /etc/kubernetes/pki/ca.crt
 # how requests to the Kubelet's server are authorized.     
 authorization:
   # [Default: "Webhook"]  
@@ -142,7 +145,7 @@ conntrack:
 mode: ipvs
 iptables:
   masqueradeAll: false
-  masqueradeBit: 16
+  masqueradeBit: 14
   minSyncPeriod: 5s
   syncPeriod: 1m
 ipvs:

@@ -225,7 +225,7 @@ cat << EOF && sleep 1
 
 EOF
 # kubeadm init
-sudo kubeadm init --config kubeadm-init.yaml
+sudo kubeadm init --config kubeadm-init.yaml -v 5
 
 # To make kubectl work for your non-root user
 mkdir -p $HOME/.kube
@@ -244,5 +244,5 @@ cat << EOF && sleep 1
 
 EOF
 # kubeadm join
-sudo kubeadm join --config kubeadm-join.yaml
+sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi

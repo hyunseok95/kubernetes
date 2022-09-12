@@ -6,7 +6,11 @@ spec:
   calicoNetwork:
     bgp: Enabled
     ipPools:
-    - cidr: 10.233.64.0/18
+    - blockSize: 26
+      cidr: 10.233.64.0/18
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
   controlPlaneTolerations:
     - key: node-role.kubernetes.io/control-plane
       effect: NoSchedule

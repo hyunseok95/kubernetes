@@ -188,9 +188,18 @@ KUBERNETES_VERSION="v1.23.0"
 KUBELET_CONFIG_VERSION="v0.4.0"
 
 # install crictl
-wget -O cni-plugin.tar.gz \
+wget -O crictl.tar.gz \
 "https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-${ARCH}.tar.gz"
-sudo tar Cxzvf /usr/local/bin cni-plugin.tar.gz && sudo rm -rf cni-plugin.tar.gz
+sudo tar Cxzvf /usr/local/bin crictl.tar.gz && sudo rm -rf crictl.tar.gz
+# config crictl
+cat << EOF | sudo tee /etc/crictl.yaml > /dev/null 
+runtime-endpoint: unix:///run/containerd/containerd.sock
+image-endpoint: unix:///run/containerd/containerd.sock
+timeout: 10
+debug: true
+pull-image-on-create: true
+EOF
+
 
 # install kubectl kubelet kubeadm  
 kube_list="kubeadm kubelet kubectl"

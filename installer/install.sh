@@ -1,109 +1,47 @@
-#!/bin/bash
-
+#!/bin/sh
 cat << EOF && sleep 1
-Start the kubernetes installation.
+Start the Kubernetes installation.
 
 EOF
 
 # Root permission check
 if [ "$(id -u)" -ne 0 ] || [ "$(id -g)" -ne 0 ]; then
 cat << EOF
-Error:
-  To install kubernetes, you must login as root.
+To install Kubernetes, you must login as root.
+Please login as root and try again
 
 Run the following command :
-  sudo -E -s
-
-Please login as root and try again
+  sudo -Es
 
 EOF
 exit 0
 fi
 
-# get env
-usage() {
-  cat <<EOF
-Usage:
-  install.sh [flag]
-
-Available Flags:
-  -t, --type (required)                Enter control-plane or node  
-  -A, --api-endpoint (required)        Enter api endpoint 
+# getting environment variables 
+cat << EOF
+The following inputs are required to install Kubernetes
+If there is no input, a default value is automatically selected.
 
 EOF
-}
+default_server_ip=$(hostname -I | awk '{ print $1 }')
+default_install_type=init
 
-declare -A hyphen_list=()
-declare -A dhyphen_list=()
+read -rp "1. Enter your server endpoint address ( $default_server_ip ): " K8S_SERVER_IP
+K8S_SERVER_IP=${K8S_SERVER_IP:-$default_server_ip}
+read -rp "2. Enter the install type either init or join ( $default_install_type ): " K8S_INSTALL_TYPE
+K8S_INSTALL_TYPE=${K8S_INSTALL_TYPE:-$default_install_type}
+if [ "$K8S_INSTALL_TYPE" != "init" ] && [ "$K8S_INSTALL_TYPE" != "join" ]; then
+cat << EOF
+Please enter either init or join
 
-HYPHEN_FLAGS=("t" "A")
-DHYPHEN_FLAGS=("type" "api-endpoint")
-
-if [ $# -eq 0 ]; then
-  usage
-  exit 0
-fi
-
-is_type=0
-is_api_endpoint=0
-while [ $# -gt 0 ]; do
-  is_exist=0
-  if [[ $1 != "-"* ]]; then
-    usage
-    exit 0
-  elif [[ $1 = "-"* ]] && [[ $1 != "--"* ]]; then
-    input_flags="${1/-/}"
-    if [ $input_flags == 't' ]; then
-      is_type=1
-    fi
-    if [ $input_flags == 'A' ]; then
-      is_api_endpoint=1
-    fi
-    for hyphen_flags in ${HYPHEN_FLAGS[*]}; do
-      if [[ "$input_flags" = "$hyphen_flags" ]]; then
-        if [ -z $2 ]; then
-          usage
-          exit 0
-        fi
-        hyphen_list[$hyphen_flags]=$2
-        shift 2
-        is_exist=1
-        break
-      fi
-    done
-    if [ $is_exist -eq 0 ]; then
-      usage
-      exit 0
-    fi
-  elif [[ $1 = "--"* ]]; then
-    input_flags="${1/--/}"
-    if [ $input_flags == 'type' ]; then
-      is_type=1
-    fi
-    if [ $input_flags == 'api-endpoint' ]; then
-      is_api_endpoint=1
-    fi
-    for dhyphen_flags in ${DHYPHEN_FLAGS[*]}; do
-      if [[ "$dhyphen_flags" = "$input_flags" ]]; then
-        if [ -z $2 ]; then
-          usage
-          exit 0
-        fi
-        dhyphen_list[$dhyphen_flags]=$2
-        shift 2
-        is_exist=1
-        break
-      fi
-    done
-    if [ $is_exist -eq 0 ]; then
-      usage
-      exit 0
-    fi
-  fi
-done
-if [ $is_type -eq 0 ] || [ $is_api_endpoint -eq 0 ]; then
-  usage
-  exit 0
+EOF
+exit 0
+elif [ "$K8S_INSTALL_TYPE" = "join" ]; then
+echo -n "3. Enter server token's hash: "
+stty -echo
+read -r GW_TOKEN_HASH
+stty echo
+echo ""
 fi
 
 cat << EOF && sleep 1
@@ -226,14 +164,15 @@ sudo systemctl enable --now kubelet
 sudo apt-get update > /dev/null 
 sudo apt-get install -y socat conntrack > /dev/null
 
-if [ "${hyphen_list[t]}" = "control-plane" ] || [ "${dhyphen_list[type]}" = "control-plane" ]; then
+if [ "$K8S_INSTALL_TYPE" = "init" ]; then
 cat << EOF && sleep 1
-#===========================#
-# Install the control plane #
-#===========================#
+#==========================#
+# Create the Control Plane #
+#==========================#
 
 EOF
 # kubeadm init
+sed -i "s/\(controlPlaneEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-init.yaml
 sudo kubeadm init --config kubeadm-init.yaml -v 5
 
 # To make kubectl work for your non-root user
@@ -245,13 +184,15 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
 kubectl create -f calico-config.yaml
 
-elif [ "${hyphen_list[t]}" = "node" ] || [ "${dhyphen_list[type]}" = "node" ]; then
+elif [ "$K8S_INSTALL_TYPE" = "join" ]; then
 cat << EOF && sleep 1
-#==================#
-# Install the node #
-#==================#
+#============================#
+# Node join to Control Plane #
+#============================#
 
 EOF
 # kubeadm join
+sed -i "s/\(apiServerEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-join.yaml
+sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
 sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi

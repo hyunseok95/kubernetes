@@ -4,7 +4,7 @@ Start the Kubernetes installation.
 
 EOF
 
-# Root permission check
+# check root login 
 if [ "$(id -u)" -ne 0 ] || [ "$(id -g)" -ne 0 ]; then
 cat << EOF
 To install Kubernetes, you must login as root.
@@ -17,19 +17,19 @@ EOF
 exit 0
 fi
 
-# getting environment variables 
+# set env
 cat << EOF
 The following inputs are required to install Kubernetes
 If there is no input, a default value is automatically selected.
 
 EOF
-default_server_ip=$(hostname -I | awk '{ print $1 }')
-default_install_type=init
+server_ip=$(hostname -I | awk '{ print $1 }')
 
-read -rp "1. Enter your server endpoint address ( $default_server_ip ): " K8S_SERVER_IP
-K8S_SERVER_IP=${K8S_SERVER_IP:-$default_server_ip}
-read -rp "2. Enter the install type either init or join ( $default_install_type ): " K8S_INSTALL_TYPE
-K8S_INSTALL_TYPE=${K8S_INSTALL_TYPE:-$default_install_type}
+read -rp "1. Enter your server address [ $server_ip ]: " K8S_SERVER_IP
+K8S_SERVER_IP=${K8S_SERVER_IP:-$server_ip}
+read -rp "2. Enter install type either init or join [ init ]: " K8S_INSTALL_TYPE
+K8S_INSTALL_TYPE=${K8S_INSTALL_TYPE:-"init"}
+
 if [ "$K8S_INSTALL_TYPE" != "init" ] && [ "$K8S_INSTALL_TYPE" != "join" ]; then
 cat << EOF
 Please enter either init or join

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 cat << EOF && sleep 1
 Start the Kubernetes installation.
 

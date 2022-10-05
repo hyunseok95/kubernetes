@@ -7,11 +7,11 @@ EOF
 # check root login 
 if [ "$(id -u)" -ne 0 ] || [ "$(id -g)" -ne 0 ]; then
 cat << EOF
-To install Kubernetes, you must login as root.
-Please login as root and try again
+To install Kubernetes, you need root privileges
+Please try with the following command
 
 Run the following command :
-  sudo -Es
+  sudo bash install.sh
 
 EOF
 exit 0
@@ -176,13 +176,14 @@ sed -i "s/\(controlPlaneEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-init.ya
 sudo kubeadm init --config kubeadm-init.yaml -v 5
 
 # To make kubectl work for your non-root user
-mkdir -p $HOME/.kube
-sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config
+USERS_NAME=$(who am i | awk '{print $1}')
+sudo mkdir -p /home/"$USERS_NAME"/.kube
+sudo cp -i /etc/kubernetes/admin.conf /home/"$USERS_NAME"/.kube/config
+sudo chown "$USERS_NAME":"$USERS_NAME" /home/"$USERS_NAME"/.kube/config
 
 # install addon for Pod networking (choose calico)
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
-kubectl create -f calico-config.yaml
+sudo -u "$USERS_NAME" kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
+sudo -u "$USERS_NAME" kubectl create -f calico-config.yaml
 
 elif [ "$K8S_INSTALL_TYPE" = "join" ]; then
 cat << EOF && sleep 1

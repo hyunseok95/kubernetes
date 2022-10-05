@@ -7,7 +7,7 @@ spec:
     bgp: Enabled
     ipPools:
     - blockSize: 26
-      cidr: 10.233.64.0/18
+      cidr: 10.96.128.0/17
       encapsulation: VXLANCrossSubnet
       natOutgoing: Enabled
       nodeSelector: all()

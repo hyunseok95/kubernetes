@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-
-#haproxy config
+# haproxy config
 sudo mkdir -p /etc/haproxy
 
 APISERVER_DEST_PORT=6443
 APISERVER_SRC_PORT=6443
-HOST1_ID="vm-1"
-HOST1_ADDRESS="local.etcd.plane"
+HOST1_ID="cluster.local.control-plane.1"
+HOST1_ADDRESS="192.168.43.236"
 
-cat <<EOF | tee /etc/haproxy/haproxy.cfg > /dev/null
+cat <<EOF | sudo tee /etc/haproxy/haproxy.cfg > /dev/null
 # /etc/haproxy/haproxy.cfg
 #---------------------------------------------------------------------
 # Global settings
@@ -60,3 +59,6 @@ backend apiserver
         server ${HOST1_ID} ${HOST1_ADDRESS}:${APISERVER_SRC_PORT} check
         # [...]
 EOF
+
+sudo mkdir -p /etc/kubernetes/manifests
+sudo cp keepalived.sh /etc/kubernetes/manifests/keepalived.yaml

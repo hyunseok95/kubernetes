@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # keepalive config
 sudo mkdir -p /etc/keepalived
+# sudo ip link add wlp1s1 type veth
+# sudo ip addr add 192.168.43.253/24 dev wlp1s1 label wlp1s1:1
 
 STATE=MASTER
 INTERFACE=wlp1s0

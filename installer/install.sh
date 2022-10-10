@@ -70,13 +70,22 @@ net.ipv4.ip_forward                 = 1
 EOF
 sudo sysctl --system > /dev/null 2>&1
 
+# add path /usr/local/bin at sudo
+is_sudo_path=$(sudo awk '/secure_path/ {print}' /etc/sudoers | grep "/usr/local/bin")
+if [[ -z $is_sudo_path ]]; then
+sudo sed -i '/secure_path/{s%[/]%/usr/local/bin:/%;}' /etc/sudoers
+fi
+
+ARCH=$(uname -i)
+[ "$ARCH" = "aarch64" ] && ARCH=arm64
+[ "$ARCH" = "x86_64" ] && ARCH=amd64
+
 cat << EOF && sleep 1
 #===========================#
 # Install container runtime #
 #===========================#
 
 EOF
-ARCH=$(dpkg --print-architecture)
 CONTAINERD_VERSION="v1.6.8"
 RUNC_VERSION="v1.1.3"
 CNI_PLUGINS_VERSION="v1.1.1"
@@ -107,7 +116,7 @@ sudo systemctl enable --now containerd
 
 # enable cri plugin and configure at containerd
 sudo mkdir -p /etc/containerd
-containerd config default | sudo sed -n 'w /etc/containerd/config.toml' 
+sudo containerd config default | sudo sed -n 'w /etc/containerd/config.toml' 
 sudo sed -i 's/\(max_container_log_line_size = \).*/\1-1/' /etc/containerd/config.toml
 sudo sed -i 's/\(SystemdCgroup = \).*/\1true/' /etc/containerd/config.toml
 
@@ -120,7 +129,6 @@ cat << EOF && sleep 1
 #====================#
 
 EOF
-ARCH=$(dpkg --print-architecture)
 CRICTL_VERSION="v1.23.0"
 KUBERNETES_VERSION="v1.23.0"
 KUBELET_CONFIG_VERSION="v0.4.0"
@@ -160,9 +168,15 @@ sudo sed -i "s:/usr/bin:/usr/local/bin:g" /usr/local/lib/systemd/system/kubelet.
 sudo systemctl daemon-reload
 sudo systemctl enable --now kubelet
 
-# package for kubeadm
-sudo apt-get update > /dev/null 
-sudo apt-get install -y socat conntrack > /dev/null
+# package for kubeadm at deb
+if [[ -n $(dpkg --version 2>/dev/null) ]]; then
+  sudo apt-get install -y socat conntrack > /dev/null
+fi
+
+# package for kubeadm at rpm
+if [[ -n $(rpm --version 2>/dev/null) ]]; then
+  sudo yum install -y socat conntrack > /dev/null
+fi
 
 if [ "$K8S_INSTALL_TYPE" = "init" ]; then
 cat << EOF && sleep 1
@@ -197,3 +211,11 @@ sed -i "s/\(apiServerEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-join.yaml
 sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
 sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi
+
+# 재 기동, 재 설치시 오류 해결 (filter, mangle, nat 체인 룰 삭제 후 컨테이너 런타임, 큐브렛 재기동 )
+# sudo iptables --flush
+# sudo iptables -t mangle --flush
+# sudo iptables -t nat --flush
+
+# sudo systemctl restart containerd 
+# sudo systemctl restart kubelet

@@ -240,17 +240,10 @@ sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
 sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi
 
-# centos 설치시 일시적으로 방화벽을 꺼준다. 
-# if [[ -n $(rpm --version 2>/dev/null) ]]; then
-#   sudo systemctl stop firewalld
+# centos 설치시 일시적으로 방화벽을 꺼준다. 파드가 다 올라간 후에 방화벽 재 시작
+# sudo systemctl stop firewalld
+# sudo systemctl start firewalld
 
-#   sudo iptables --flush
-#   sudo iptables -t mangle --flush
-#   sudo iptables -t nat --flush
-
-#   sudo systemctl restart containerd 
-#   sudo systemctl restart kubelet
-
-#   sleep 10s
-#   sudo systemctl start firewalld
-# fi
+# 재 기동 오류시 방화벽 체인룰을 초기화 한다. 
+# sudo iptables --flush && sudo iptables -t mangle --flush && sudo iptables -t nat --flush
+# sudo systemctl restart containerd && sudo systemctl restart kubelet

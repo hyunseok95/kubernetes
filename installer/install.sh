@@ -240,19 +240,7 @@ sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
 sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi
 
-# package for kubeadm at deb
-if [[ -n $(dpkg --version 2>/dev/null) ]]; then
-  sudo apt-get install -y socat conntrack > /dev/null
-fi
-
-# package for kubeadm at rpm
-if [[ -n $(rpm --version 2>/dev/null) ]]; then
-  sudo yum install -y socat conntrack > /dev/null
-fi
-
-# 재 기동, 재 설치시 오류 해결 (filter, mangle, nat 체인 룰 삭제 후 컨테이너 런타임, 큐브렛 재기동 )
 # centos 설치시 일시적으로 방화벽을 꺼준다. 
-# package for kubeadm at rpm
 # if [[ -n $(rpm --version 2>/dev/null) ]]; then
 #   sudo systemctl stop firewalld
 

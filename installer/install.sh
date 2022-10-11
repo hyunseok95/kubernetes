@@ -17,6 +17,45 @@ EOF
 exit 0
 fi
 
+# Check required packages
+deb_required_package_list="tar wget sed socat conntrack"
+rpm_required_package_list="tar wget sed socat conntrack-tools"
+fast_runner=""
+slow_runner=""
+
+# which in deb
+if [[ -n $(dpkg --version 2>/dev/null) ]]; then
+  for deb_required_package in $deb_required_package_list; do
+    if [ -z "$(dpkg --get-selections $deb_required_package 2>/dev/null)" ]; then
+    fast_runner="$slow_runner $deb_required_package"
+    slow_runner="$fast_runner"
+    fi
+  done
+fi
+
+# which in rpm
+if [[ -n $(rpm --version 2>/dev/null) ]]; then
+  for rpm_required_package in $rpm_required_package_list; do
+    if [ -z "$(rpm -qa $rpm_required_package 2>/dev/null)" ]; then
+    fast_runner="$slow_runner $rpm_required_package"
+    slow_runner="$fast_runner"
+    fi
+  done
+fi
+
+if [ -n "$fast_runner" ]; then
+cat << EOF
+To install Kubernetes, you need to install some packages.
+
+List of packages that need to be installed :
+EOF
+for i in $fast_runner; do
+echo "  $i"
+done
+echo ""
+exit 0
+fi
+
 # set env
 cat << EOF
 The following inputs are required to install Kubernetes
@@ -146,7 +185,6 @@ debug: true
 pull-image-on-create: true
 EOF
 
-
 # install kubectl kubelet kubeadm  
 kube_list="kubeadm kubelet kubectl"
 for kube_item in $kube_list; do
@@ -167,16 +205,6 @@ sudo sed -i "s:/usr/bin:/usr/local/bin:g" /usr/local/lib/systemd/system/kubelet.
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now kubelet
-
-# package for kubeadm at deb
-if [[ -n $(dpkg --version 2>/dev/null) ]]; then
-  sudo apt-get install -y socat conntrack > /dev/null
-fi
-
-# package for kubeadm at rpm
-if [[ -n $(rpm --version 2>/dev/null) ]]; then
-  sudo yum install -y socat conntrack > /dev/null
-fi
 
 if [ "$K8S_INSTALL_TYPE" = "init" ]; then
 cat << EOF && sleep 1
@@ -212,10 +240,29 @@ sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
 sudo kubeadm join --config kubeadm-join.yaml -v 5
 fi
 
-# 재 기동, 재 설치시 오류 해결 (filter, mangle, nat 체인 룰 삭제 후 컨테이너 런타임, 큐브렛 재기동 )
-# sudo iptables --flush
-# sudo iptables -t mangle --flush
-# sudo iptables -t nat --flush
+# package for kubeadm at deb
+if [[ -n $(dpkg --version 2>/dev/null) ]]; then
+  sudo apt-get install -y socat conntrack > /dev/null
+fi
 
-# sudo systemctl restart containerd 
-# sudo systemctl restart kubelet
+# package for kubeadm at rpm
+if [[ -n $(rpm --version 2>/dev/null) ]]; then
+  sudo yum install -y socat conntrack > /dev/null
+fi
+
+# 재 기동, 재 설치시 오류 해결 (filter, mangle, nat 체인 룰 삭제 후 컨테이너 런타임, 큐브렛 재기동 )
+# centos 설치시 일시적으로 방화벽을 꺼준다. 
+# package for kubeadm at rpm
+# if [[ -n $(rpm --version 2>/dev/null) ]]; then
+#   sudo systemctl stop firewalld
+
+#   sudo iptables --flush
+#   sudo iptables -t mangle --flush
+#   sudo iptables -t nat --flush
+
+#   sudo systemctl restart containerd 
+#   sudo systemctl restart kubelet
+
+#   sleep 10s
+#   sudo systemctl start firewalld
+# fi

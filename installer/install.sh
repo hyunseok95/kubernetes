@@ -26,7 +26,7 @@ slow_runner=""
 # which in deb
 if [[ -n $(dpkg --version 2>/dev/null) ]]; then
   for deb_required_package in $deb_required_package_list; do
-    if [ -z "$(dpkg --get-selections $deb_required_package 2>/dev/null)" ]; then
+    if [ -z "$(dpkg --get-selections "$deb_required_package" 2>/dev/null)" ]; then
     fast_runner="$slow_runner $deb_required_package"
     slow_runner="$fast_runner"
     fi
@@ -36,7 +36,7 @@ fi
 # which in rpm
 if [[ -n $(rpm --version 2>/dev/null) ]]; then
   for rpm_required_package in $rpm_required_package_list; do
-    if [ -z "$(rpm -qa $rpm_required_package 2>/dev/null)" ]; then
+    if [ -z "$(rpm -qa "$rpm_required_package" 2>/dev/null)" ]; then
     fast_runner="$slow_runner $rpm_required_package"
     slow_runner="$fast_runner"
     fi
@@ -188,9 +188,9 @@ EOF
 # install kubectl kubelet kubeadm  
 kube_list="kubeadm kubelet kubectl"
 for kube_item in $kube_list; do
-sudo wget -O /usr/local/bin/$kube_item \
+sudo wget -O /usr/local/bin/"$kube_item" \
 "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/$kube_item"
-sudo chmod +x /usr/local/bin/$kube_item
+sudo chmod +x /usr/local/bin/"$kube_item"
 done
 
 # config kubelet uses systemd 
@@ -217,15 +217,20 @@ EOF
 sed -i "s/\(controlPlaneEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-init.yaml
 sudo kubeadm init --config kubeadm-init.yaml -v 5
 
-# To make kubectl work for your non-root user
+# To make kubectl work for root user
+mkdir -p "$HOME"/.kube
+sudo cp -i /etc/kubernetes/admin.conf "$HOME"/.kube/config
+sudo chown $(id -u):$(id -g) "$HOME"/.kube/config
+
+# To make kubectl work for non-root user ( shell login )
 USERS_NAME=$(logname)
 sudo mkdir -p /home/"$USERS_NAME"/.kube
 sudo cp -i /etc/kubernetes/admin.conf /home/"$USERS_NAME"/.kube/config
 sudo chown "$USERS_NAME":"$USERS_NAME" /home/"$USERS_NAME"/.kube/config
 
 # install addon for Pod networking (choose calico)
-sudo -u "$USERS_NAME" kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
-sudo -u "$USERS_NAME" kubectl create -f calico-config.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
+kubectl create -f calico-config.yaml
 
 elif [ "$K8S_INSTALL_TYPE" = "join" ]; then
 cat << EOF && sleep 1

@@ -218,7 +218,7 @@ sed -i "s/\(controlPlaneEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-init.ya
 sudo kubeadm init --config kubeadm-init.yaml -v 5
 
 # To make kubectl work for your non-root user
-USERS_NAME=$(who am i | awk '{print $1}')
+USERS_NAME=$(logname)
 sudo mkdir -p /home/"$USERS_NAME"/.kube
 sudo cp -i /etc/kubernetes/admin.conf /home/"$USERS_NAME"/.kube/config
 sudo chown "$USERS_NAME":"$USERS_NAME" /home/"$USERS_NAME"/.kube/config

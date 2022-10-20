@@ -5,8 +5,15 @@ metadata:
   namespace: kube-system
 spec:
   containers:
-    - image: haproxy:2.1.4
+    - image: haproxy@sha256:b684e681920a0ed18868758c2ab137fca7f7c20404016ae0d5e56acaacc2318f
       name: haproxy
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
       livenessProbe:
         failureThreshold: 8
         httpGet:

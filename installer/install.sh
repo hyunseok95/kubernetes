@@ -2,9 +2,13 @@
 #
 # Perform installation of Kubernetes
 
-K8S_SERVER_IP=''
+K8S_LOCAL_SERVER_IP=''
+K8S_GLOBAL_SERVER_ENDPOINT=''
 K8S_INSTALL_TYPE=''
-GW_TOKEN_HASH=''
+K8S_JOIN_TYPE=''
+K8S_CRT_KEY=''
+K8S_TOKEN=''
+K8S_TOKEN_HASH=''
 
 KUBERNETES_VERSION='v1.23.0'
 KUBELET_CONFIG_VERSION='v0.4.0'
@@ -95,33 +99,60 @@ pre_check() {
 ##########################
 # Read values and set env
 # Globals:
-#   K8S_SERVER_IP
+#   K8S_LOCAL_SERVER_IP
+#   K8S_GLOBAL_SERVER_ENDPOINT
 #   K8S_INSTALL_TYPE
-#   GW_TOKEN_HASH
+#   K8S_TOKEN_HASH
 # Arguments:
 #   None
 # Outputs:
 #   None
 ##########################
 set_env() {
-  local server_ip
-  server_ip=$(ip route get "$(ip route show 0.0.0.0/0 \
+  K8S_LOCAL_SERVER_IP="$(ip route get "$(ip route show 0.0.0.0/0 \
     | awk -F via '{ print $2 }' | awk '{ print $1 }')" \
-    | awk -F src '{ print $2 }' | awk '{ print $1 }')
+    | awk -F src '{ print $2 }' | awk '{ print $1 }')"
 
   info "Set environment variables to install Kubernetes. \nDefault values are assigned automatically."
 
-  read -rp "1. Enter your server address [ $server_ip ]: " K8S_SERVER_IP
-  K8S_SERVER_IP=${K8S_SERVER_IP:-$server_ip}
+  read -rp '1. Enter your server address [ '"${K8S_LOCAL_SERVER_IP}"':6443 ]: ' K8S_GLOBAL_SERVER_ENDPOINT
+  K8S_GLOBAL_SERVER_ENDPOINT=${K8S_GLOBAL_SERVER_ENDPOINT:-$K8S_LOCAL_SERVER_IP':6443'}
   read -rp "2. Enter install type either init or join [ init ]: " K8S_INSTALL_TYPE
   K8S_INSTALL_TYPE=${K8S_INSTALL_TYPE:-"init"}
-  if [[ "$K8S_INSTALL_TYPE" != "init" ]] && [[ "$K8S_INSTALL_TYPE" != "join" ]]; then
-    error "Please enter either init or join"
-    exit 1
-  elif [ "$K8S_INSTALL_TYPE" = "join" ]; then
-    read -rsp "3. Enter server token's hash (sha256: 55064baf...): " GW_TOKEN_HASH && echo
-  fi
-  echo
+  case "${K8S_INSTALL_TYPE}" in
+    init) 
+      echo 
+      ;;
+    join)
+      read -rp "3. Enter join type either control-plane or node [ node ]: " K8S_JOIN_TYPE
+      K8S_JOIN_TYPE=${K8S_JOIN_TYPE:-"node"}
+      case "${K8S_JOIN_TYPE}" in
+        control-plane)
+          echo -e '4. Enter the server certificate-key (e.g <' "$(kubeadm certs certificate-key)"' >)'
+          read -rp ' : ' K8S_CRT_KEY 
+          echo -e '5. Enter the server token (e.g < '"$(kubeadm token generate)"' >)'
+          read -rp ' : ' K8S_TOKEN
+          echo -e '6. Enter the server token'"'"'s hash value (e.g < sha:256:'"$(kubeadm certs certificate-key)"' >)'
+          read -rp ' : ' K8S_TOKEN_HASH
+          ;;
+        node)
+          echo -e '4. Enter the server token (e.g < '"$(kubeadm token generate)"' >)'
+          read -rp ' : ' K8S_TOKEN
+          echo -e '5. Enter the server token'"'"'s hash value (e.g < sha256:'"$(kubeadm certs certificate-key)"' >)'
+          read -rp ' : ' K8S_TOKEN_HASH
+          ;;
+        *)
+          error "Please enter either control-plane or node"
+          exit 1
+          ;;
+      esac
+      echo
+      ;;
+    *)
+      error "Please enter either control-plane or node"
+      exit 1
+      ;;
+  esac
 }
 
 ####################################
@@ -210,7 +241,7 @@ container_runtime() {
 
   # install runc
   if [[ -n $(which runc) ]] ; then
-    skip "Skip install runc:${RUNC_VERSION} \n\n  Current runc version: \n  >> $(runc --v | sed -n '1p')"
+    notify "Skip install runc:${RUNC_VERSION} \n\n  Current runc version: \n  >> $(runc --v | sed -n '1p')"
   else
     info "Install runc:${RUNC_VERSION}"
     curl -Lo runc "https://github.com/opencontainers/runc/releases/download/${RUNC_VERSION}/runc.${ARCH}"
@@ -219,7 +250,7 @@ container_runtime() {
 
   # install containerd
   if [[ -n $(which containerd) ]] ; then
-    skip "Skip install containerd:${CONTAINERD_VERSION} \n\n  Current containerd version: \n  >> $(containerd -v)"
+    notify "Skip install containerd:${CONTAINERD_VERSION} \n\n  Current containerd version: \n  >> $(containerd -v)"
   else
     info "Install containerd:${CONTAINERD_VERSION}"
     curl -L "https://github.com/containerd/containerd/releases/download/${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION/v/}-linux-${ARCH}.tar.gz" \
@@ -293,9 +324,9 @@ EOF
 #################################
 # Configure a Kubernetes cluster
 # Globals:
-#   K8S_SERVER_IP
+#   K8S_GLOBAL_SERVER_ENDPOINT
 #   K8S_INSTALL_TYPE
-#   GW_TOKEN_HASH
+#   K8S_TOKEN_HASH
 # Arguments:
 #   File:
 #    - kubeadm-init.yaml
@@ -304,16 +335,32 @@ EOF
 #   None
 #################################
 clustering() {
+  local certificate_key
+  local token
+
   info "Kubernetes Clustering"
 
   case "${K8S_INSTALL_TYPE}" in
   init)
     info "Init the Control Plane"
+    certificate_key="$(kubeadm certs certificate-key)"
+    token="$(kubeadm token generate)"
 
     # kubeadm init
-    cp kubeadm-init.yaml kubeadm-init.yaml.old 
-    sed "s/\(controlPlaneEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-init.yaml.old | sudo sed -n 'w kubeadm-init.yaml'
+    sudo cp kubeadm-init.yaml kubeadm-init.yaml.old 
+    sed 's/{{--GLOBAL_SERVER_ENDPOINT--}}/'"${K8S_GLOBAL_SERVER_ENDPOINT}"'/' kubeadm-init.yaml.old \
+      | sed 's/{{--LOCAL_SERVER_IP--}}/'"${K8S_LOCAL_SERVER_IP}"'/' \
+      | sed 's/{{--CRT_KEY--}}/'"${certificate_key}"'/' \
+      | sed 's/{{--TOKEN--}}/'"${token}"'/' \
+      | sudo sed -n 'w kubeadm-init.yaml'
+
+    
+
+    trap 'error "The kubernetes installation failed." && exit 1' ERR
+
     sudo kubeadm init --config kubeadm-init.yaml -v 5
+    
+    trap - ERR
 
     # To make kubectl work for root user
     mkdir -p /root/.kube
@@ -327,17 +374,47 @@ clustering() {
 
     # install addon for Pod networking (choose calico)
     kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml" && sleep 5
-    kubectl create -f calico-config.yaml
+    kubectl create -f calico-config.yaml && echo
 
-    info "Kubernetes installation is complete. \n\nRun the following command : \n  kubectl get pods -o wide -A"
+    info 'you can join control-plane by using this certificate-key: \n\n'"  >> certificateKey: ${certificate_key}"
+    
+    info 'you can join control-plane or node by using this token: \n\n  >> token: '"${token}"'\n  >> token'"'"'s hash: sha256:'"$(openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 | awk '{print $2}')"
+    
+    info "The kubernetes installation is complete. \n\nRun the following command : \n  kubectl get pods -o wide -A"
     ;;
   join)
     info "Join to Control Plane"
 
     # kubeadm join
-    sed -i "s/\(apiServerEndpoint: \).*/\1${K8S_SERVER_IP}:6443/" kubeadm-join.yaml
-    sed -i "s/- sha256:.*/- ${GW_TOKEN_HASH}/" kubeadm-join.yaml
+    sudo cp kubeadm-join.yaml kubeadm-join.yaml.old 
+
+    case "${K8S_JOIN_TYPE}" in
+      control-plane)
+        sed 's/{{--GLOBAL_SERVER_ENDPOINT--}}/'"${K8S_GLOBAL_SERVER_ENDPOINT}"'/' kubeadm-join.yaml.old \
+          | sed 's/{{--LOCAL_SERVER_IP--}}/'"${K8S_LOCAL_SERVER_IP}"'/' \
+          | sed 's/{{--CRT_KEY--}}/'"${K8S_CRT_KEY}"'/' \
+          | sed 's/{{--TOKEN--}}/'"${K8S_TOKEN}"'/' \
+          | sed 's/{{--CA_CRT_HASH--}}/'"${K8S_TOKEN_HASH}"'/' \
+          | sudo sed -n 'w kubeadm-join.yaml'
+        ;;
+      node)
+        sudo cp kubeadm-join.yaml kubeadm-join.yaml.old 
+        sed 's/{{--GLOBAL_SERVER_ENDPOINT--}}/'"${K8S_GLOBAL_SERVER_ENDPOINT}"'/' kubeadm-join.yaml.old \
+          | sed 's/{{--TOKEN--}}/'"${K8S_TOKEN}"'/' \
+          | sed 's/{{--CA_CRT_HASH--}}/'"${K8S_TOKEN_HASH}"'/' \
+          | sudo sed -n 'w kubeadm-join.yaml'
+        ;;
+      *)
+        error "Please enter either control-plane or node"
+        exit 1
+        ;;
+    esac
+
+    trap 'error "The current node has failed to join the cluster." && exit 1' ERR
+
     sudo kubeadm join --config kubeadm-join.yaml -v 5
+
+    trap - ERR
 
     info "The current node has successfully joined the cluster. "
     ;;
@@ -352,7 +429,7 @@ info() {
   sleep 1
 }
 
-skip() {
+notify() {
   echo -e "\e[0m[\e[33mSKIP\e[0m]: $*\n" >&1
   sleep 1
 }

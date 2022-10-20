@@ -2,22 +2,25 @@
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 bootstrapTokens:
-- token: "gustjr.qnxmtmxmfoqxhzms"
+- token: {{--TOKEN--}}
   ttl: "1h"
   usages:
   - authentication
   - signing
-certificateKey: 7ff2ee8c0b348b678b934dda3ad78dafd0cd6dcb9d794df3bc19d5ae289ebc42
 nodeRegistration:
   criSocket: unix:////var/run/containerd/containerd.sock
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/control-plane
+certificateKey: {{--CRT_KEY--}}
+localAPIEndpoint:
+  advertiseAddress: {{--LOCAL_SERVER_IP--}}
+  bindPort: 6443
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
 kubernetesVersion: v1.23.0
-controlPlaneEndpoint: 10.0.0.1:6443
+controlPlaneEndpoint: {{--GLOBAL_SERVER_ENDPOINT--}}
 clusterName: cluster.local
 networking:
   dnsDomain: cluster.local

@@ -49,8 +49,8 @@ pre_check() {
   declare -a rpm_required_package_list
   declare -a target_package_list
 
-  deb_required_package_list=(tar curl sed socat conntrack)
-  rpm_required_package_list=(tar curl sed socat conntrack-tools)
+  deb_required_package_list=(tar curl sed socat conntrack ethtool)
+  rpm_required_package_list=(tar curl sed socat conntrack-tools ethtool)
 
   info "Pre-checking..."
 
@@ -115,10 +115,11 @@ set_env() {
 
   info "Set environment variables to install Kubernetes. \nDefault values are assigned automatically."
 
-  read -rp '1. Enter your server address [ '"${K8S_LOCAL_SERVER_IP}"':6443 ]: ' K8S_GLOBAL_SERVER_ENDPOINT
+  read -rp '1. Enter your server endpoint [ '"${K8S_LOCAL_SERVER_IP}"':6443 ]: ' K8S_GLOBAL_SERVER_ENDPOINT
   K8S_GLOBAL_SERVER_ENDPOINT=${K8S_GLOBAL_SERVER_ENDPOINT:-$K8S_LOCAL_SERVER_IP':6443'}
   read -rp "2. Enter install type either init or join [ init ]: " K8S_INSTALL_TYPE
   K8S_INSTALL_TYPE=${K8S_INSTALL_TYPE:-"init"}
+  
   case "${K8S_INSTALL_TYPE}" in
     init) 
       echo 
@@ -149,7 +150,7 @@ set_env() {
       echo
       ;;
     *)
-      error "Please enter either control-plane or node"
+      error "Please enter either init or join"
       exit 1
       ;;
   esac
@@ -199,19 +200,13 @@ EOF
   sudo awk '{ 
     if ($0 ~ /secure_path/ && $1 !~ /^#/) {
       if ($NF ~ /".*"/) {
-        if ($NF !~ /\/usr\/local\/sbin/) {
-          $NF = gensub(/"(.+)"/, "\"\\1:/usr/local/sbin\"", 1, $NF);
-        } 
-        if ($NF !~ /\/usr\/local\/bin/) {
-          $NF = gensub(/"(.+)"/, "\"\\1:/usr/local/bin\"", 1, $NF);
-        }
-      } else {
-        if ($NF !~ /\/usr\/local\/sbin/) {
-          $NF = gensub(/(.+)/, "\\1:/usr/local/sbin", 1, $NF);
-        } 
-        if ($NF !~ /\/usr\/local\/bin/) {
-          $NF = gensub(/(.+)/, "\\1:/usr/local/bin", 1, $NF);
-        }
+        gsub(/"/, "", $0);
+      } 
+      if ($NF !~ /\/usr\/local\/sbin/) {
+        sub(/.+/, "&:/usr/local/sbin", $0);
+      } 
+      if ($NF !~ /\/usr\/local\/bin/) {
+        sub(/.+/, "&:/usr/local/bin", $0);
       }
     }
     print $0;
@@ -311,10 +306,10 @@ EOF
   # config kubelet via systemd
   sudo mkdir -p /usr/local/lib/systemd/system/kubelet.service.d
   curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBELET_CONFIG_VERSION}/cmd/kubepkg/templates/latest/deb/kubelet/lib/systemd/system/kubelet.service" \
-    | awk '{ print gensub(/\/usr\/bin/, "/usr/local/bin", "g", $0);}' \
+    | awk '{ gsub(/\/usr\/bin/, "/usr/local/bin", $0); print}' \
     | sudo sed -n 'w /usr/local/lib/systemd/system/kubelet.service'
   curl -sSL "https://raw.githubusercontent.com/kubernetes/release/${KUBELET_CONFIG_VERSION}/cmd/kubepkg/templates/latest/deb/kubeadm/10-kubeadm.conf" \
-    | awk '{ print gensub(/\/usr\/bin/, "/usr/local/bin", "g", $0);}' \
+    | awk '{ gsub(/\/usr\/bin/, "/usr/local/bin", $0); print}' \
     | sudo sed -n 'w /usr/local/lib/systemd/system/kubelet.service.d/10-kubeadm.conf'
 
   sudo systemctl daemon-reload
@@ -354,12 +349,10 @@ clustering() {
       | sed 's/{{--TOKEN--}}/'"${token}"'/' \
       | sudo sed -n 'w kubeadm-init.yaml'
 
-    
-
     trap 'error "The kubernetes installation failed." && exit 1' ERR
 
-    sudo kubeadm init --config kubeadm-init.yaml -v 5
-    
+    sudo kubeadm init --config kubeadm-init.yaml --upload-certs -v 5
+
     trap - ERR
 
     # To make kubectl work for root user
@@ -374,7 +367,10 @@ clustering() {
 
     # install addon for Pod networking (choose calico)
     kubectl create -f "https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml" && sleep 5
-    kubectl create -f calico-config.yaml && echo
+    kubectl create -f calico-config.yaml
+
+    # install k8s metrics-server
+    kubectl create -f metrics-server.yaml && echo
 
     info 'you can join control-plane by using this certificate-key: \n\n'"  >> certificateKey: ${certificate_key}"
     
@@ -395,6 +391,8 @@ clustering() {
           | sed 's/{{--CRT_KEY--}}/'"${K8S_CRT_KEY}"'/' \
           | sed 's/{{--TOKEN--}}/'"${K8S_TOKEN}"'/' \
           | sed 's/{{--CA_CRT_HASH--}}/'"${K8S_TOKEN_HASH}"'/' \
+          | sed '/taints: \[\]/d' \
+          | sed 's/# //g' \
           | sudo sed -n 'w kubeadm-join.yaml'
         ;;
       node)
@@ -430,7 +428,7 @@ info() {
 }
 
 notify() {
-  echo -e "\e[0m[\e[33mSKIP\e[0m]: $*\n" >&1
+  echo -e "\e[0m[\e[33mNOTIFY\e[0m]: $*\n" >&1
   sleep 1
 }
 

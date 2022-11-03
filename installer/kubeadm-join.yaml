@@ -5,14 +5,17 @@ discovery:
     apiServerEndpoint: {{--GLOBAL_SERVER_ENDPOINT--}}
     token: {{--TOKEN--}}
     caCertHashes:
-     - {{--CA_CRT_HASH--}}
+      - {{--CA_CRT_HASH--}}
     unsafeSkipCAVerification: false
   timeout: 40s
   tlsBootstrapToken: {{--TOKEN--}}
 caCertPath: /etc/kubernetes/pki/ca.crt
 nodeRegistration:
   criSocket: unix:////var/run/containerd/containerd.sock
-  taint: []
+  taints: []
+#   taints:
+#     - effect: NoSchedule
+#       key: node-role.kubernetes.io/control-plane
 # controlPlane:
 #   certificateKey: {{--CRT_KEY--}}
 #   localAPIEndpoint:

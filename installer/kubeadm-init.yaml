@@ -2,16 +2,19 @@
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 bootstrapTokens:
-- token: {{--TOKEN--}}
-  ttl: "1h"
-  usages:
-  - authentication
-  - signing
+  - token: {{--TOKEN--}}
+    ttl: "1h"
+    description: "Short time token for join"
+    usages:
+      - authentication
+      - signing
+    groups:
+      - system:bootstrappers:kubeadm:default-node-token
 nodeRegistration:
   criSocket: unix:////var/run/containerd/containerd.sock
   taints:
-  - effect: NoSchedule
-    key: node-role.kubernetes.io/control-plane
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
 certificateKey: {{--CRT_KEY--}}
 localAPIEndpoint:
   advertiseAddress: {{--LOCAL_SERVER_IP--}}
@@ -46,36 +49,31 @@ apiServer:
   # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
   extraArgs:
     # If true, allow privileged containers. [Default: false]
-    allow-privileged: "true"
+    allow-privileged: "True"
     # Enables anonymous requests to the secure port of the API server. [Default: true]
-    anonymous-auth: "true"
-    # Ordered list of plug-ins to do authorization on secure port. [Default: Node,RBAC] 
+    anonymous-auth: "True"
+    # Ordered list of plug-ins to do authorization on secure port. [Default: Node,RBAC]
     authorization-mode: Node,RBAC
     # Turns on aggregator routing requests to endpoints IP rather than cluster IP.
-    enable-aggregator-routing: "false"
+    enable-aggregator-routing: "False"
     # Enable to allow secrets of type 'bootstrap.kubernetes.io/token' in the 'kube-system' namespace
-    enable-bootstrap-token-auth: "true"
+    enable-bootstrap-token-auth: "True"
     # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
-    profiling: "true"
+    profiling: "True"
     # A port range to reserve for services with NodePort visibility
     service-node-port-range: 30000-32767
     # number for the log level verbosity
     v: "5"
-  extraVolumes:
-  - name: usr-share-ca-certificates
-    hostPath: /var/lib/kube-apiserver/ca-cert
-    mountPath: /usr/share/ca-certificates
-    readOnly: true
   timeoutForControlPlane: 5m0s
 controllerManager:
   # https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
   extraArgs:
     # The number of garbage collector workers that are allowed to sync concurrently. [Default: 20]
-    concurrent-gc-syncs: "40"
+    concurrent-gc-syncs: "20"
     # The number of resource quotas that are allowed to sync concurrently. [Default: 5]
-    concurrent-resource-quota-syncs: "10"
+    concurrent-resource-quota-syncs: "5"
     # Enable profiling via web interface [Ex: https:/10.10.10.3:6443/debug/pprof/]
-    profiling: "true"
+    profiling: "True"
     # number for the log level verbosity
     v: "5"
 scheduler:
@@ -96,7 +94,7 @@ syncFrequency: 1m
 # duration checking config files for new data. [Default: "20s"]
 fileCheckFrequency: 20s
 # duration checking http for new data. [Default: "20s"]
-httpCheckFrequency: 20s 
+httpCheckFrequency: 20s
 # set to 0.0.0.0 for all interfaces. [Default: "0.0.0.0"]
 address: "0.0.0.0"
 port: 10250
@@ -108,20 +106,20 @@ authentication:
   webhook:
     # [Default: true]
     enabled: true
-    # [Default: "2m"]  
+    # [Default: "2m"]
     cacheTTL: 2m
   x509:
     clientCAFile: /etc/kubernetes/pki/ca.crt
-# how requests to the Kubelet's server are authorized.     
+# how requests to the Kubelet's server are authorized.
 authorization:
-  # [Default: "Webhook"]  
+  # [Default: "Webhook"]
   mode: Webhook
-  webhook: 
-    # [Default: "5m"]  
+  webhook:
+    # [Default: "5m"]
     cacheAuthorizedTTL: "5m"
-    # [Default: "30s"]  
+    # [Default: "30s"]
     cacheUnauthorizedTTL: "30s"
-# the maximum event creations per second. [Default: 5]   
+# the maximum event creations per second. [Default: 5]
 eventRecordQPS: 5
 # enables log access and local running of containers
 enableDebuggingHandlers: true
@@ -137,26 +135,36 @@ metricsBindAddress: 127.0.0.1:10249
 # Profiling handlers will be handled by metrics server.
 enableProfiling: true
 conntrack:
-  # the maximum number of NAT connections to track per CPU core 
+  # the maximum number of NAT connections to track per CPU core
   maxPerCore: 0
   min: 100000
-  tcpCloseWaitTimeout: 2s
-  tcpEstablishedTimeout: 60s
+  # tcpEstablishedTimeout is how long an idle TCP connection will be kept open (e.g. '2s'). Must be greater than 0 to set.
+  tcpEstablishedTimeout: "5s"
+  # tcpCloseWaitTimeout is how long an idle conntrack entry in CLOSE_WAIT state will remain in the conntrack table. (e.g. '60s'). Must be greater than 0 to set.
+  tcpCloseWaitTimeout: "60s"
 # userspace, iptables, ipvs
 mode: ipvs
 iptables:
+  syncPeriod: "30s"
+  minSyncPeriod: "5s"
   masqueradeAll: false
   masqueradeBit: 14
-  minSyncPeriod: 5s
-  syncPeriod: 1m
 ipvs:
-  syncPeriod: 1m
-  minSyncPeriod: 5s
+  # syncPeriod is the period that ipvs rules are refreshed
+  syncPeriod: "30s"
+  # minSyncPeriod is the minimum period that ipvs rules are refreshed
+  minSyncPeriod: "5s"
+  # ipvs scheduler
+  scheduler: "rr"
+  # excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch when cleaning up ipvs services.
   excludeCIDRs: []
-  scheduler: rr
+  # strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries from kube-ipvs0 interface
   strictARP: false
-  tcpTimeout: 0s
-  tcpFinTimeout: 0s
-  udpTimeout: 0s
+  # tcpTimeout is the timeout value used for idle IPVS TCP sessions. The default value is 0
+  tcpTimeout: "0s"
+  # tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN. The default value is 0
+  tcpFinTimeout: "0s"
+  # udpTimeout is the timeout value used for IPVS UDP packets. The default value is 0
+  udpTimeout: "0s"
 # Only applicable for proxyMode=userspace.
-udpIdleTimeout: 250ms
+udpIdleTimeout: "250ms"
